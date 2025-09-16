@@ -535,12 +535,12 @@ def main():
 
                 # Fallback: fetch & extrack from article URL
                 if not html and item["url"]:
-                    html = fetch_article_html(item["link"])
+                    html = fetch_article_html(item["url"])
 
                 # Convert to Notion blocks (fallback paragraph if still no content)
                 children = html_to_blocks(html) if html else []
                 if not children:
-                    fallback = "Open on the web: " + (item["link"] or "No URL")
+                    fallback = "Open on the web: " + (item["url"] or "No URL")
                     children = [ # type: ignore
                         {
                             "type": "paragraph",
