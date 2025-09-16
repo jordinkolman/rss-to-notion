@@ -9,6 +9,7 @@ from pathlib import Path
 from dateutil import parser as dateparser
 from typing import List, Dict, Any, Optional, Union
 from urllib import request
+from urllib.parse import urlparse, urljoin
 from xml.etree import ElementTree as ET
 
 from notion_client import Client
@@ -57,11 +58,11 @@ if PROPERTY_MAP:
     except json.JSONDecodeError:
         raise ValueError(f"Invalid JSON in PROPERTY_MAP: {PROPERTY_MAP}")
 
-# ---------Logging-----------
+# --------- Logging -----------
 log = logging.getLogger("rss2notion")
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-# ---------Notion Client-----------
+# --------- Notion Client -----------
 notion_kwargs = {
     "auth": NOTION_TOKEN,
 }
@@ -183,6 +184,20 @@ def append_blocks(page_id: str, blocks: List[dict[str, Any]], chunk_size: int = 
 
 # ---------- Helpers: Feed Parsing & Content Selection -----------
 
+def _normalize_url(href: str | None, base_url: str | None = None) -> str | None:
+    if not href:
+        return None
+    href = href.strip()
+    # drop schemes Notion won't accept in rich_text links
+    if href.startswith(("javascript:", "data:", "about:", "#")):
+        return None
+    if base_url:
+        return urljoin(base_url, href)
+    p = urlparse(href)
+    if p.scheme in ('http', 'https') and p.netloc:
+        return href
+    return None
+
 
 def first_html_content(entry: Dict[str, Any]) -> Optional[str]:
     """
@@ -277,7 +292,7 @@ def link_text_obj(content: str, url: str, **ann) -> Dict[str, Any]:  # type: ign
     return obj
 
 
-def build_rich_text_inline(node, ann=None, href=None) -> List[Dict[str, Any]]:  # type: ignore
+def build_rich_text_inline(node, ann=None, href=None, base_url=None) -> List[Dict[str, Any]]:  # type: ignore
     """
     Recursively converts inline HTML into Notion rich_text[]
     Supports <a>, <strong>/<em>/<b>/<i>, <code>, <br>
@@ -311,9 +326,14 @@ def build_rich_text_inline(node, ann=None, href=None) -> List[Dict[str, Any]]:  
             new_ann[INLINE_TAGS[tag]] = True
 
         # Links
-        new_href = href  # type: ignore
-        if tag == "a" and node.get("href"):
-            new_href = node.get("href")  # type: ignore
+        if tag == "a":
+            cand = node.get("href")
+            new_href = _normalize_url(cand, base_url=base_url)  # type: ignore
+        # when emitting text
+        if href:
+            out.append(link_text_obj(s, href, **ann))  # type: ignore
+        else:
+            out.append(text_obj(node.text, **ann))  # type: ignore
 
         for child in node.children:
             out.extend(build_rich_text_inline(child, new_ann, new_href))  # type: ignore
@@ -323,7 +343,7 @@ def build_rich_text_inline(node, ann=None, href=None) -> List[Dict[str, Any]]:  
     return out
 
 
-def block_from_tag(tag: Tag) -> Union[Dict[str, Any], List[Dict[str, Any]], None]:
+def block_from_tag(tag: Tag, base_url=None) -> Union[Dict[str, Any], List[Dict[str, Any]], None]:  # type: ignore
     """
     Map a block-level HTML element to 1 or more Notion blocks
 
@@ -376,10 +396,14 @@ def block_from_tag(tag: Tag) -> Union[Dict[str, Any], List[Dict[str, Any]], None
 
     # Image (external)
     if name == "img" and tag.get("src"):
-        return {
-            "type": "image",
-            "image": {"type": "external", "external": {"url": tag.get("src")}},
-        }  # type: ignore
+        src = _normalize_url(tag.get("src"), base_url=base_url)  # type: ignore
+        if src:
+            return {
+                "type": "image",
+                "image": {"type": "external", "external": {"url": src}},
+            }  # type: ignore
+        else:
+            return None # drop invalid image URLs
 
     # Generic Containers: Flatten Children
     if name in ("div", "section", "article", "main"):
@@ -394,7 +418,7 @@ def block_from_tag(tag: Tag) -> Union[Dict[str, Any], List[Dict[str, Any]], None
                         }
                     )  # type: ignore
             elif isinstance(child, Tag):
-                block = block_from_tag(child)
+                block = block_from_tag(child, base_url=base_url)
                 if isinstance(block, list):
                     blocks.extend(block)
                 elif block:
@@ -409,7 +433,7 @@ def block_from_tag(tag: Tag) -> Union[Dict[str, Any], List[Dict[str, Any]], None
     }  # type: ignore
 
 
-def html_to_blocks(html: str, max_blocks: int = 180) -> List[Dict[str, Any]]:
+def html_to_blocks(html: str, base_url: str | None = None,max_blocks: int = 180) -> List[Dict[str, Any]]:
     """
     Convert HTML to a list of Notion blocks.
     """
@@ -431,7 +455,7 @@ def html_to_blocks(html: str, max_blocks: int = 180) -> List[Dict[str, Any]]:
         if not isinstance(el, Tag):
             continue
 
-        block = block_from_tag(el)
+        block = block_from_tag(el, base_url=base_url)
         if isinstance(block, list):
             blocks.extend(block)
         elif block:
@@ -538,7 +562,7 @@ def main():
                     html = fetch_article_html(item["url"])
 
                 # Convert to Notion blocks (fallback paragraph if still no content)
-                children = html_to_blocks(html) if html else []
+                children = html_to_blocks(html, base_url=item["url"]) if html else []
                 if not children:
                     fallback = "Open on the web: " + (item["url"] or "No URL")
                     children = [ # type: ignore

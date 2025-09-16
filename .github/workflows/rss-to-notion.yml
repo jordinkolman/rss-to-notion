@@ -6,14 +6,36 @@ on:
   workflow_dispatch: {}     # manual 'Run workflow' button
 
 permissions:
-  contents: write
+  contents: write  # needed to push to the state branch
 
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # we need refs to manage a second branch
+
+      # Prepare a worktree for the 'state' branch under .state/
+      - name: Prepare state worktree
+        run: |
+          git fetch origin state || true
+          if git rev-parse --verify origin/state >/dev/null 2>&1; then
+            git worktree add .state origin/state
+          else
+            # create an orphan 'state' branch with an empty state.json
+            git worktree add -b state .state
+            echo "[]" > .state/state.json
+            pushd .state
+            git config user.name "rss-to-notion-bot"
+            git config user.email "rss2notion-bot@users.noreply.github.com"
+            git add state.json
+            git commit -m "init state branch"
+            git push -u origin HEAD:state
+            popd
+          fi
+          # copy current state into workspace root for the script
+          cp .state/state.json state.json || echo "[]">state.json
 
       - uses: actions/setup-python@v5
         with:
@@ -26,18 +48,20 @@ jobs:
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-          FEEDS: ${{ secrets.FEEDS }}            # or use FEEDS_OPML_URL
+          FEEDS: ${{ secrets.FEEDS }}
           FEEDS_OPML_URL: ${{ secrets.FEEDS_OPML_URL }}
           PROPERTY_MAP: ${{ secrets.PROPERTY_MAP }}
-          NOTION_VERSION: ${{ vars.NOTION_VERSION }}  # optional pin, e.g. 2025-09-03
+          NOTION_VERSION: ${{ secrets.NOTION_VERSION }}
         run: python ingest.py
 
-      - name: Commit state.json (if changed)
+      # Write updated state back to 'state' branch (not the default branch)
+      - name: Commit updated state to 'state' branch
         run: |
-          if [ -f state.json ]; then
-            git config --global user.name 'RSS to Notion'
-            git config --global user.email 'rss-to-notion@users.noreply.github.com'
-            git add state.json
-            git commit -m 'chore: update state [skip ci]' || echo 'No changes to commit'
-            git push
-          fi
+          cp state.json .state/state.json
+          pushd .state
+          git config user.name "rss-to-notion-bot"
+          git config user.email "rss2notion-bot@users.noreply.github.com"
+          git add state.json
+          git commit -m "chore: update state [skip ci]" || echo "No changes"
+          git push origin HEAD:state
+          popd
