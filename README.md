@@ -16,10 +16,28 @@ Runs on a schedule in **GitHub Actions**; No servers, no subscription-based auto
 - A Notion integration with access to the database
 - A free GitHub account
 
-### 1) Create a Notion Integration & Share your Database (one-time)
+## 1) Create a Notion Integration & Share your Database (one-time)
 1. Create an internal integration at Notion's developer site: https://www.notion.so/my-integrations, and copy the **Internal Integration Token**.
 2. In Notion, opern your target database -> Connections -> Add Connection -> Choose the integration you just created.
-3. Copy the **Database ID** from the URL bar.
+
+### How to get the Database URL (and ID)
+
+1. Open the source database as a full page (not a linked database).
+
+  - If your database is inline on a page, click the database’s ••• menu and choose Open as page (or Copy link to view). This gives you the database’s own URL.
+
+> Note: the API can’t operate on linked databases; you need the original source database.
+
+2. Copy the URL (from your browser bar or via Share → Copy link).
+
+3. Find the 32-character ID in that URL: it’s the long hex string for the database.
+
+ - In classic notion.so style links, it’s the string between the last slash and the ?. Example pattern:
+https://www.notion.so/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?v=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb → aaaaaaaa… is your database_id.
+
+- In workspace vanity links (e.g., yourname.notion.site), you’ll often see a title slug followed by a dash and then the 32-char ID (or sometimes just the 32-char ID at the end). Example:
+https://acme.notion.site/Blog-0f2b82d5ea1a4cc9a8d288d2e1f01f18 → 0f2b82d5ea1a4cc9a8d288d2e1f01f18.
+
 
 > Note: Notion rate-limits requests. This project retries on 429 errors and spaces requests out a bit to stay friendly
 
