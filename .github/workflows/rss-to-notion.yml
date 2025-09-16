@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}     # manual 'Run workflow' button
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   run:
@@ -31,3 +31,13 @@ jobs:
           PROPERTY_MAP: ${{ secrets.PROPERTY_MAP }}
           NOTION_VERSION: ${{ vars.NOTION_VERSION }}  # optional pin, e.g. 2025-09-03
         run: python ingest.py
+
+      - name: Commit state.json (if changed)
+        run: |
+          if [ -f state.json ]; then
+            git config --global user.name 'RSS to Notion'
+            git config --global user.email 'rss-to-notion@users.noreply.github.com'
+            git add state.json
+            git commit -m 'chore: update state [skip ci]' || echo 'No changes to commit'
+            git push
+          fi

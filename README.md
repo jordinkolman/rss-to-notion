@@ -90,6 +90,28 @@ If you prefer different names, set a `PROPERTY_MAP` secret like:
 }
 ```
 
+## Heads-up: first run volume
+On the first run, the workflow ingests **all items currently exposed by each feed** (often 10–50 per feed, sometimes more). Expect a burst of pages the first time; later runs only pick up new items (or, if you’ve configured “today only,” just today’s).
+
+## Deletions stay deleted (`state.json`)
+This repo keeps a tiny `state.json` so items you’ve already imported **won’t be recreated** if you delete their page in Notion. You normally don’t need to touch this file.
+
+**Want a deleted item to come back next run?**
+
+- **Reset everything:** delete `state.json` from the repo and run the workflow again (all current feed items become eligible).
+
+- **Restore a single item:** generate its key, remove that line from `state.json`, commit, and run again:
+  ```bash
+  # Replace with your feed URL and the item's GUID (if present) or its article URL
+  python - <<'PY'
+  import hashlib
+  FEED_URL="https://feeds.arstechnica.com/arstechnica/index"
+  GUID_OR_URL="https://example.com/that-article"
+  print(hashlib.sha256(f"{FEED_URL}|{GUID_OR_URL}".encode()).hexdigest()[:32])
+  PY
+  ```
+Then open state.json, delete the printed key, save/commit, and re-run the workflow.
+
 ---
 ## Troubleshooting
 - **No pages appear** → Most often the integration wasn’t connected to that database: in Notion DB → Connections → Add connections.

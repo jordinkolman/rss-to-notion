@@ -5,6 +5,7 @@ import logging
 import json
 import feedparser  # type: ignore
 
+from pathlib import Path
 from dateutil import parser as dateparser
 from typing import List, Dict, Any, Optional, Union
 from urllib import request
@@ -68,7 +69,30 @@ if NOTION_VERSION:
     notion_kwargs["version"] = NOTION_VERSION
 notion = Client(**notion_kwargs)  # type: ignore
 
-# ----------Helpers: Notion API with backoff-----------
+# --------- Helpers: State Management -----------
+STATE_FILE = Path("state.json")
+
+def _load_state() -> set[str]:
+    if STATE_FILE.exists():
+        try:
+            return set(json.loads(STATE_FILE.read_text()))
+        except json.JSONDecodeError:
+            log.error(f"Failed to load state from {STATE_FILE}; Returning empty state")
+            return set()
+    return set()
+
+def _save_state(seen: set[str]) -> None:
+    STATE_FILE.write_text(json.dumps(sorted(seen)))
+
+def _seen_key(feed_url: str, guid: str | None, link: str | None) -> str:
+    '''
+    Feed-qualified key so 2 different feeds can have the same GUID.
+    '''
+
+    base = guid or link or ""
+    return hashlib.sha256(f"{feed_url}{base}".encode()).hexdigest()[:32]
+
+# ---------- Helpers: Notion API with backoff -----------
 
 
 def backoff_call(fn, max_retries=8, **kwargs):  # type: ignore
@@ -485,6 +509,9 @@ def main():
         log.warning("No feeds configured (set FEEDS or FEEDS_OPML_URL).")
         return
 
+    seen = _load_state()
+    state_dirty = False
+
     for url in feeds:
         try:
             parsed = feedparser.parse(url)  # type: ignore
@@ -494,8 +521,13 @@ def main():
             for e in parsed.entries:  # type: ignore
                 item = parse_entry(e, src, url)  # type: ignore
 
-                # Skip if we already have this item
+                # Skip if we already have this item in Notion database
                 if exists_by_guid_or_url(item["guid"], item["url"]):
+                    continue
+
+                # Skip if this item is in seen state
+                k = _seen_key(url, item["guid"], item["url"])  # type: ignore
+                if k in seen:
                     continue
 
                 # Prefer full content from the feed
@@ -525,6 +557,10 @@ def main():
                 if rest:
                     append_blocks(page_id, rest, chunk_size=50)  # type: ignore
 
+                # Add to seen state
+                seen.add(k)
+                state_dirty = True
+
                 new_count += 1
                 time.sleep(0.35)  # keep a rate-limit friendly pace
 
@@ -532,6 +568,9 @@ def main():
 
         except Exception as e:
             log.exception(f"Error processing {url}: {e}")
+
+        if state_dirty:
+            _save_state(seen)
 
 
 if __name__ == "__main__":
