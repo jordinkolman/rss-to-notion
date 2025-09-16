@@ -502,7 +502,7 @@ def main():
                 html = first_html_content(e)  # type: ignore
 
                 # Fallback: fetch & extrack from article URL
-                if not html and item["link"]:
+                if not html and item["url"]:
                     html = fetch_article_html(item["link"])
 
                 # Convert to Notion blocks (fallback paragraph if still no content)
