@@ -91,10 +91,12 @@ If you prefer different names, set a `PROPERTY_MAP` secret like:
 ```
 
 ## Heads-up: first run volume
-On the first run, the workflow ingests **all items currently exposed by each feed** (often 10–50 per feed, sometimes more). Expect a burst of pages the first time; later runs only pick up new items (or, if you’ve configured “today only,” just today’s).
+On the first run, the workflow ingests **all items currently exposed by each feed** (often 10–50 per feed, sometimes more). Expect a burst of pages the first time; later runs only pick up new items (unless you modify state tracking as described below).
 
 ## Deletions stay deleted (`state.json`)
 This repo keeps a tiny `state.json` so items you’ve already imported **won’t be recreated** if you delete their page in Notion. You normally don’t need to touch this file.
+
+This state file is automatically created and updated on a new `state` branch (this was done to keep my personal feed state separate from the template)
 
 **Want a deleted item to come back next run?**
 
