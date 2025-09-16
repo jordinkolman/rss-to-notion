@@ -431,10 +431,10 @@ def parse_entry(e: Dict[str, Any], feed_title: str, feed_url: str) -> Dict[str, 
     link = e.get("link")
     guid = e.get("id") or e.get("guid") or str(link)
     author = e.get("author", "")
-    tags = [
-        t.get("term")
+    tags = [ # type: ignore
+        t.get("term") # type: ignore
         for t in e.get("tags", [])
-        if isinstance(t, dict) and t.get("term")
+        if isinstance(t, dict) and t.get("term") # type: ignore
     ]  # type: ignore
     published = None
     if "published" in e:
@@ -509,7 +509,7 @@ def main():
                 children = html_to_blocks(html) if html else []
                 if not children:
                     fallback = "Open on the web: " + (item["link"] or "No URL")
-                    children = [
+                    children = [ # type: ignore
                         {
                             "type": "paragraph",
                             "paragraph": {"rich_text": [text_obj(fallback)]},
