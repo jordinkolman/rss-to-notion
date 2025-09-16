@@ -326,17 +326,13 @@ def build_rich_text_inline(node, ann=None, href=None, base_url=None) -> List[Dic
             new_ann[INLINE_TAGS[tag]] = True
 
         # Links
+        new_href = href  # type: ignore
         if tag == "a":
             cand = node.get("href")
             new_href = _normalize_url(cand, base_url=base_url)  # type: ignore
-        # when emitting text
-        if href:
-            out.append(link_text_obj(s, href, **ann))  # type: ignore
-        else:
-            out.append(text_obj(node.text, **ann))  # type: ignore
 
         for child in node.children:
-            out.extend(build_rich_text_inline(child, new_ann, new_href))  # type: ignore
+            out.extend(build_rich_text_inline(child, new_ann, new_href, base_url=base_url))  # type: ignore
 
         return out
 
