@@ -1,0 +1,33 @@
+name: RSS to Notion
+
+on:
+  schedule:
+    - cron: "0 * * * *"    # hourly (UTC). You can change this; min is */5
+  workflow_dispatch: {}     # manual 'Run workflow' button
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Ingest feeds → Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          FEEDS: ${{ secrets.FEEDS }}            # or use FEEDS_OPML_URL
+          FEEDS_OPML_URL: ${{ secrets.FEEDS_OPML_URL }}
+          PROPERTY_MAP: ${{ secrets.PROPERTY_MAP }}
+          NOTION_VERSION: ${{ vars.NOTION_VERSION }}  # optional pin, e.g. 2025-09-03
+        run: python ingest.py

@@ -58,7 +58,7 @@ if PROPERTY_MAP:
 
 # ---------Logging-----------
 log = logging.getLogger("rss2notion")
-logging.basicConfig(level=logging.INFO, format="$(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 # ---------Notion Client-----------
 notion_kwargs = {
@@ -495,7 +495,7 @@ def main():
                 item = parse_entry(e, src, url)  # type: ignore
 
                 # Skip if we already have this item
-                if exists_by_guid_or_url(item["guid"], item["link"]):
+                if exists_by_guid_or_url(item["guid"], item["url"]):
                     continue
 
                 # Prefer full content from the feed

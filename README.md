@@ -94,6 +94,8 @@ If you prefer different names, set a `PROPERTY_MAP` secret like:
 ## Troubleshooting
 - **No pages appear** → Most often the integration wasn’t connected to that database: in Notion DB → Connections → Add connections.
 
-- **Schedule timing** → GitHub cron uses UTC. Min schedule is */5 (every 5 minutes).
+- **Schedule timing** → GitHub cron uses UTC. Default schedule is 0 * * * * (every hour on the hour). Min schedule is */5 (every 5 minutes).
+
+- **Duplicates** → The script dedupes by GUID or URL; if a feed has neither stable GUIDs nor canonical links, duplicates can happen.
 
 - **Content empty** → Some sites block automated fetchers; Trafilatura generally handles this well, but if a site blocks it, you can swap the fetch to stdlib/HTTPX for that domain and pass the HTML into Trafilatura for extraction.
